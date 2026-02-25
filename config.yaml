@@ -1,0 +1,21 @@
+kaggle:
+  dataset_name: "giovanniiacuzzo/audio-sicurezza-delle-reti"
+  download_path: "data/"
+
+audio:
+  sample_rate: 16000
+  apply_noise_reduction: true
+
+model:
+  name: "large-v3"
+  device: "cuda"
+  compute_type: "float16"
+
+transcription:
+  language: "it"
+  beam_size: 5
+  vad_filter: true 
+  vad_parameters:
+    min_silence_duration_ms: 500
+
+  initial_prompt: "Questa è la trascrizione fluida, corretta e pulita di una lezione universitaria in italiano, senza esitazioni o interruzioni."
