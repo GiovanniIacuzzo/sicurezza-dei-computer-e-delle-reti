@@ -1,48 +1,81 @@
-import yaml
+import logging
+from pathlib import Path
+from typing import List, Optional, Dict
+
 from faster_whisper import WhisperModel
+from config import AppConfig
+
+logger = logging.getLogger(__name__)
+
+class TranscriptionResult:
+    """Data class per strutturare l'output della trascrizione."""
+    def __init__(self, text: str, language: str, probability: float, segments: List[Dict]):
+        self.text = text
+        self.language = language
+        self.probability = probability
+        self.segments = segments
 
 class WhisperTranscriber:
-    def __init__(self, config_path="config.yaml"):
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
-            
-        model_config = self.config["model"]
-        
-        print(f"Caricamento modello Whisper '{model_config['name']}' su {model_config['device'].upper()} "
-              f"({model_config['compute_type']})...")
-        
-        # Inizializza il modello SOTA. compute_type="float16" dimezza la VRAM necessaria.
-        self.model = WhisperModel(
-            model_size_or_path=model_config["name"],
-            device=model_config["device"],
-            compute_type=model_config["compute_type"]
+    def __init__(self, config: AppConfig):
+        self.cfg = config
+        self._model: Optional[WhisperModel] = None
+        self._load_model()
+
+    def _load_model(self) -> None:
+        """Inizializza il modello con gestione delle risorse."""
+        try:
+            logger.info(
+                f"Loading Whisper {self.cfg.model.name} on {self.cfg.model.device.upper()} "
+                f"({self.cfg.model.compute_type})"
+            )
+            self._model = WhisperModel(
+                model_size_or_path=self.cfg.model.name,
+                device=self.cfg.model.device,
+                compute_type=self.cfg.model.compute_type
+            )
+        except Exception as e:
+            logger.critical(f"Failed to initialize Whisper model: {e}")
+            raise RuntimeError("Model initialization failed.") from e
+
+    def transcribe(self, audio_path: Path) -> TranscriptionResult:
+        """
+        Esegue la trascrizione con logging granulare e ritorno strutturato.
+        """
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        t_cfg = self.cfg.transcription
+        logger.info(f"Starting transcription: {audio_path.name}")
+
+        segments_gen, info = self._model.transcribe(
+            str(audio_path),
+            language=t_cfg.language,
+            beam_size=t_cfg.beam_size,
+            vad_filter=t_cfg.vad_filter,
+            vad_parameters=t_cfg.vad_parameters.model_dump(),
+            initial_prompt=t_cfg.initial_prompt,
+            condition_on_previous_text=False
         )
 
-    def transcribe(self, audio_path: str) -> str:
-        """Trascrive l'audio gestendo allucinazioni (VAD) ed esitazioni (Prompt)."""
-        transcription_config = self.config["transcription"]
-        
-        print(f"Inizio trascrizione di {audio_path}...")
-        
-        # Esecuzione dell'inferenza con tutti i parametri di sicurezza
-        segments, info = self.model.transcribe(
-            audio_path,
-            language=transcription_config["language"],
-            beam_size=transcription_config["beam_size"],
-            vad_filter=transcription_config["vad_filter"],
-            vad_parameters=transcription_config["vad_parameters"],
-            initial_prompt=transcription_config["initial_prompt"],
-            condition_on_previous_text=False # Fondamentale: impedisce che ripeta la stessa frase all'infinito se si "incastra"
-        )
-        
-        print(f"Lingua rilevata: {info.language} (probabilità: {info.language_probability:.2f})")
-        
-        full_text = []
-        # 'segments' è un generatore. Il calcolo vero e proprio avviene man mano che iteriamo.
-        for segment in segments:
-            # Opzionale: puoi stampare il progresso in tempo reale
-            print(f"[{segment.start:.2f}s -> {segment.end:.2f}s] {segment.text}")
-            full_text.append(segment.text.strip())
+        logger.info(f"Detected language: {info.language} ({info.language_probability:.2%})")
+
+        processed_segments = []
+        full_text_parts = []
+
+        for segment in segments_gen:
+            logger.debug(f"[{segment.start:.2f}s -> {segment.end:.2f}s] Processing segment...")
             
-        # Uniamo tutti i segmenti in un unico grande testo, separandoli con uno spazio
-        return " ".join(full_text)
+            segment_data = {
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text.strip()
+            }
+            processed_segments.append(segment_data)
+            full_text_parts.append(segment_data["text"])
+
+        return TranscriptionResult(
+            text=" ".join(full_text_parts),
+            language=info.language,
+            probability=info.language_probability,
+            segments=processed_segments
+        )

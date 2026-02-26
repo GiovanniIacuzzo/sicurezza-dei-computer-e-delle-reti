@@ -1,91 +1,106 @@
 import os
-os.environ['KAGGLE_CONFIG_DIR'] = '.'
-import json
+import shutil
+import logging
 import yaml
+from typing import List, Optional
+from pathlib import Path
 from kaggle.api.kaggle_api_extended import KaggleApi
 
-def load_config(config_path="config.yaml"):
-    """Carica le impostazioni dal file YAML."""
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-def create_metadata(data_path: str, dataset_id: str):
-    """Genera automaticamente il file dataset-metadata.json richiesto da Kaggle."""
-    try:
-        username, slug = dataset_id.split('/')
-    except ValueError:
-        raise ValueError("Il 'dataset_name' nel config.yaml deve essere nel formato 'tuo-username/nome-dataset'.")
-
-    # Creiamo un titolo leggibile partendo dallo slug (es. "nome-dataset-lezioni" -> "Nome Dataset Lezioni")
-    title = slug.replace('-', ' ').title()
-    
-    metadata = {
-        "title": title,
-        "id": dataset_id,
-        "licenses": [{"name": "CC0-1.0"}] # Licenza di default (Pubblico Dominio)
-    }
-    
-    metadata_path = os.path.join(data_path, "dataset-metadata.json")
-    with open(metadata_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=4)
+class KaggleUploader:
+    def __init__(self, config_path: str = "config.yaml"):
+        self.config_path = Path(config_path)
+        self.config = self._load_config()
         
-    print(f"[*] Creato file di metadati in: {metadata_path}")
+        self.dataset_id: str = self.config["kaggle"]["dataset_name"]
 
-def main():
-    config = load_config()
-    dataset_id = config["kaggle"]["dataset_name"]
-    data_path = "data" # La cartella dove hai messo i tuoi file .mp4
-    
-    print("="*50)
-    print(f"Inizio procedura di upload verso Kaggle ({dataset_id})")
-    print("="*50)
-
-    # 1. Controllo base: la cartella esiste e contiene file?
-    if not os.path.exists(data_path):
-        print(f"[ERRORE] La cartella '{data_path}' non esiste nel tuo computer.")
-        return
+        self.archive_path = Path("data")
+        self.queue_path = Path("new_data")
         
-    files_in_dir = [f for f in os.listdir(data_path) if f.endswith(('.mp4', '.m4a'))]
-    if not files_in_dir:
-        print(f"[ERRORE] Nessun file .mp4 trovato nella cartella '{data_path}'. Aggiungi gli audio prima di caricare.")
-        return
+        os.environ['KAGGLE_CONFIG_DIR'] = os.path.abspath('.')
+        self.api = KaggleApi()
         
-    print(f"[*] Trovati {len(files_in_dir)} file audio da caricare.")
+        self._prepare_directories()
+        self._fix_token_permissions()
 
-    # 2. Inizializzazione API Kaggle
-    try:
-        api = KaggleApi()
-        api.authenticate()
-    except Exception as e:
-        print(f"[ERRORE] Autenticazione fallita. Assicurati di avere il file kaggle.json in ~/.kaggle/ nel tuo computer locale.\nDettagli: {e}")
-        return
+    def _load_config(self) -> dict:
+        if not self.config_path.exists():
+            raise FileNotFoundError(f"Configurazione non trovata: {self.config_path}")
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
 
-    # 3. Creazione del file metadata
-    create_metadata(data_path, dataset_id)
+    def _prepare_directories(self) -> None:
+        self.archive_path.mkdir(parents=True, exist_ok=True)
+        self.queue_path.mkdir(parents=True, exist_ok=True)
 
-    # 4. Upload su Kaggle
-    print("\n[*] Connessione ai server Kaggle in corso... (potrebbe volerci un po' a seconda della tua connessione)")
-    
-    try:
-        # Tenta prima di creare una nuova versione (se il dataset esiste già su Kaggle)
-        api.dataset_create_version(
-            folder=data_path,
-            version_notes="Nuovi audio aggiunti o aggiornati",
-            dir_mode="zip"
-        )
-        print("\n[SUCCESSO] Nuova versione del dataset caricata correttamente!")
-        
-    except Exception as e:
-        # Se fallisce, probabilmente il dataset non è mai stato creato, quindi lo crea da zero
-        print("[*] Il dataset non esiste ancora. Creazione di un nuovo dataset in corso...")
+    def _fix_token_permissions(self) -> None:
+        """Risolve il warning sulla leggibilità del file kaggle.json su sistemi Unix."""
+        token_path = Path("kaggle.json")
+        if token_path.exists() and os.name != 'nt':
+            os.chmod(token_path, 0o600)
+            logger.debug("Permessi kaggle.json impostati a 600.")
+
+    def _authenticate(self) -> None:
+        """Autenticazione con verifica di autorizzazione."""
         try:
-            api.dataset_create_new(
-                folder=data_path,
+            self.api.authenticate()
+            user = self.api.config_values.get('username')
+            logger.info(f"Autenticato come utente: {user}")
+        except Exception as e:
+            logger.error(f"Errore autenticazione: {e}")
+            raise
+
+    def get_pending_files(self) -> List[Path]:
+        extensions = ('.mp4', '.m4a', '.wav', '.mp3')
+        return [p for p in self.queue_path.iterdir() if p.suffix.lower() in extensions]
+
+    def process_upload(self, version_notes: Optional[str] = None) -> bool:
+        pending_files = self.get_pending_files()
+        
+        if not pending_files:
+            logger.warning(f"Nessun file trovato in {self.queue_path}. Operazione annullata.")
+            return False
+
+        self._authenticate()
+        
+        file_names = [f.name for f in pending_files]
+        logger.info(f"File identificati per lo staging: {file_names}")
+
+        try:
+            for file_path in pending_files:
+                dest_file = self.archive_path / file_path.name
+                shutil.copy2(file_path, dest_file)
+            
+            notes = version_notes or f"Update: {', '.join(file_names)}"
+
+            logger.info(f"Avvio caricamento su Kaggle per il dataset: {self.dataset_id}")
+            
+            self.api.dataset_create_version(
+                folder=str(self.archive_path),
+                version_notes=notes,
                 dir_mode="zip"
             )
-            print("\n[SUCCESSO] Nuovo dataset creato e caricato correttamente!")
-        except Exception as ex:
-            print(f"\n[ERRORE CRITICO] Impossibile caricare il dataset. Dettagli: {ex}")
+            
+            logger.info("Upload completato. Procedo alla pulizia della coda.")
+            self._cleanup_queue(pending_files)
+            return True
+
+        except Exception as e:
+            logger.error(f"Errore critico durante l'upload: {e}")
+            return False
+
+    def _cleanup_queue(self, files: List[Path]) -> None:
+        for file_path in files:
+            try:
+                file_path.unlink()
+            except Exception as e:
+                logger.error(f"Impossibile rimuovere {file_path.name}: {e}")
 
 if __name__ == "__main__":
-    main()
+    uploader = KaggleUploader()
+    uploader.process_upload()

@@ -1,64 +1,84 @@
-import os
-import yaml
 import subprocess
+import logging
+from pathlib import Path
 import librosa
 import soundfile as sf
 import noisereduce as nr
+from config import AppConfig
+
+logger = logging.getLogger(__name__)
+
+class AudioProcessingError(Exception):
+    """Exception custom per errori legati al processamento audio."""
+    pass
 
 class AudioPreprocessor:
-    def __init__(self, config_path="config.yaml"):
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
-        
-        self.sample_rate = self.config["audio"]["sample_rate"]
-        self.apply_nr = self.config["audio"]["apply_noise_reduction"]
+    def __init__(self, config: AppConfig):
+        self.config = config.audio
+        self.temp_dir = Path("data/temp_audio")
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    def _extract_audio(self, video_path: str, temp_wav_path: str):
-        """Estrae l'audio dal video mp4 usando ffmpeg, forzando mono e 16kHz."""
-        print(f"Estrazione audio da {video_path}...")
-        # Il comando ffmpeg: -vn (no video), -acodec pcm_s16le (formato wav), -ar 16000 (sample rate), -ac 1 (mono)
+    def _execute_ffmpeg(self, input_path: Path, output_path: Path) -> None:
+        """Esegue l'estrazione audio delegando a FFmpeg."""
         command = [
-            "ffmpeg", "-y", "-i", video_path, 
-            "-vn", "-acodec", "pcm_s16le", 
-            "-ar", str(self.sample_rate), "-ac", "1", 
-            temp_wav_path
+            "ffmpeg", "-y", "-i", str(input_path),
+            "-vn", "-acodec", "pcm_s16le",
+            "-ar", str(self.config.sample_rate), "-ac", "1",
+            str(output_path)
         ]
         
-        # Eseguiamo silenziosamente
-        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        if not os.path.exists(temp_wav_path):
-            raise FileNotFoundError(f"Errore: FFmpeg non ha generato il file {temp_wav_path}")
-        return temp_wav_path
+        try:
+            logger.info(f"Extracting audio from {input_path.name}")
+            subprocess.run(
+                command, 
+                check=True, 
+                capture_output=True, 
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(f"FFmpeg error: {e.stderr}")
+            raise AudioProcessingError(f"Failed to extract audio: {e.stderr}")
 
-    def process(self, video_path: str) -> str:
-        """Pipeline completa: estrazione ed eventuale denoise. Ritorna il percorso dell'audio pronto."""
-        base_name = os.path.splitext(os.path.basename(video_path))[0]
-        temp_dir = "data/temp_audio"
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        raw_wav_path = os.path.join(temp_dir, f"{base_name}_raw.wav")
-        final_wav_path = os.path.join(temp_dir, f"{base_name}_ready.wav")
+    def _apply_noise_reduction(self, input_path: Path, output_path: Path) -> None:
+        """Applica algoritmi di DSP per la pulizia del segnale."""
+        logger.info(f"Applying noise reduction to {input_path.name}")
+        try:
+            audio_data, sr = librosa.load(str(input_path), sr=self.config.sample_rate)
+            
+            reduced_audio = nr.reduce_noise(
+                y=audio_data, 
+                sr=sr, 
+                stationary=True, 
+                prop_decrease=0.8
+            )
+            
+            sf.write(str(output_path), reduced_audio, sr)
+        except Exception as e:
+            logger.error(f"Denoise failed: {e}")
+            raise AudioProcessingError(f"Noise reduction failed: {e}")
 
-        # 1. Estrazione audio dal video
-        self._extract_audio(video_path, raw_wav_path)
+    def process(self, video_path_str: str) -> Path:
+        """Pipeline orchestrator con gestione del ciclo di vita dei file."""
+        video_path = Path(video_path_str)
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video non trovato: {video_path}")
 
-        # 2. Riduzione del rumore (opzionale ma consigliata per le aule)
-        if self.apply_nr:
-            print(f"Applicazione riduzione del rumore per {base_name}...")
-            # Carichiamo l'audio
-            audio_data, sr = librosa.load(raw_wav_path, sr=self.sample_rate)
-            
-            # Applichiamo noisereduce (usa un algoritmo spettrale per eliminare rumori stazionari)
-            reduced_noise_audio = nr.reduce_noise(y=audio_data, sr=sr, prop_decrease=0.8)
-            
-            # Salviamo il file pulito
-            sf.write(final_wav_path, reduced_noise_audio, sr)
-            
-            # Pulizia file temporaneo
-            os.remove(raw_wav_path)
-            return final_wav_path
-        else:
-            # Se non facciamo il denoise, il file raw è già il nostro file finale
-            os.rename(raw_wav_path, final_wav_path)
-            return final_wav_path
+        raw_wav = self.temp_dir / f"{video_path.stem}_raw.wav"
+        final_wav = self.temp_dir / f"{video_path.stem}_ready.wav"
+
+        try:
+            self._execute_ffmpeg(video_path, raw_wav)
+
+            if self.config.apply_noise_reduction:
+                self._apply_noise_reduction(raw_wav, final_wav)
+                raw_wav.unlink()
+            else:
+                raw_wav.replace(final_wav)
+
+            logger.info(f"Processing completed: {final_wav}")
+            return final_wav
+
+        except Exception as e:
+            if raw_wav.exists(): raw_wav.unlink()
+            logger.critical(f"Pipeline failed for {video_path.name}: {e}")
+            raise
