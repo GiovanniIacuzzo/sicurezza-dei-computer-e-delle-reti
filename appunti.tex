@@ -1,0 +1,101 @@
+\documentclass[a4paper,12pt]{article}
+
+% --- Codifica e lingua (pdfLaTeX) ---
+\usepackage[T1]{fontenc}         % codifica per il testo
+\usepackage[utf8]{inputenc}      % codifica file sorgente
+\usepackage[italian]{babel}      % lingua principale
+
+% --- Simboli IPA ---
+\usepackage{tipa}                % simboli IPA (usa codifica T3 internamente)
+
+% --- Layout e spaziatura ---
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage{microtype}
+
+% --- Matematica ---
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{bm}
+
+% --- Grafica e tabelle ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{colortbl}
+\usepackage{xcolor}
+
+% --- Testo e impaginazione ---
+\usepackage{ragged2e}
+\usepackage{enumitem}
+\usepackage{titling}
+
+% --- Algoritmi ---
+\usepackage[ruled,vlined]{algorithm2e}
+
+% --- Riferimenti e hyperlink ---
+\usepackage[hyphens]{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{cite}
+
+% --- Impostazioni indice ---
+\usepackage{tocloft}
+
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\setlength{\cftbeforesecskip}{4pt}
+\setlength{\cftbeforesubsecskip}{2pt}
+\setlength{\cftbeforesubsubsecskip}{1pt}
+\renewcommand{\cftdotsep}{1}
+
+% --- Impostazioni aggiuntive ---
+\setlength{\parindent}{1.2em}    % Rientro dei paragrafi
+\setlength{\parskip}{0.5em}      % Spazio tra paragrafi
+\onehalfspacing                  % Interlinea 1.5 per tesi
+
+\geometry{margin=2.2cm}
+\setlength{\droptitle}{-3em}
+
+\captionsetup{font=small, labelfont=bf}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.85}
+
+% --- Titolo e autore ---
+\pretitle{\begin{center}\LARGE\bfseries}
+\posttitle{\par\end{center}\vskip 1em}
+\preauthor{\begin{flushleft}\large}
+\postauthor{\end{flushleft}\vskip 1em}
+\predate{}
+\postdate{}
+
+\title{
+    \vspace{-2em}
+    \textit{\LARGE Sicurezza dei Computer e delle Reti}\\[1em]
+    {\large Università degli Studi di Enna "Kore"}
+}
+\author{Giovanni Giuseppe Iacuzzo - Giovanni Micciche\hfill \today}
+\date{}
+
+\begin{document}
+\sloppy
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+\maketitle
+\onehalfspacing
+
+\input{Sezioni/index.tex}
+
+\newpage
+\section{Introduzione}
+\subsection{}
+\input{Sezioni/Intro.tex}
+
+
+
+
+\end{document}

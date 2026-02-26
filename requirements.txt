@@ -1,0 +1,11 @@
+torch
+torchaudio
+faster-whisper==1.0.1
+librosa==0.10.1
+noisereduce==3.0.2
+
+av
+kaggle==1.6.6
+pyyaml==6.0.1
+tqdm==4.66.2
+setuptools
