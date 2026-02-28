@@ -2,3 +2,5 @@ data/
 *.pdf
 kaggle.json
 compiler/
+.DS_Store
+__pycache__/
