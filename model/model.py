@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Dict, Optional
+from tqdm import tqdm
 
 from faster_whisper import WhisperModel
 from config import AppConfig
@@ -8,7 +9,6 @@ from config import AppConfig
 logger = logging.getLogger(__name__)
 
 class TranscriptionResult:
-    """Data class per strutturare l'output della trascrizione."""
     def __init__(self, text: str, language: str, probability: float, segments: List[Dict]):
         self.text = text
         self.language = language
@@ -22,12 +22,8 @@ class WhisperTranscriber:
         self._load_model()
 
     def _load_model(self) -> None:
-        """Inizializza il modello con gestione delle risorse."""
         try:
-            logger.info(
-                f"Loading Whisper {self.cfg.model.name} on {self.cfg.model.device.upper()} "
-                f"({self.cfg.model.compute_type})"
-            )
+            logger.info(f"Loading Whisper {self.cfg.model.name} on {self.cfg.model.device.upper()}...")
             self._model = WhisperModel(
                 model_size_or_path=self.cfg.model.name,
                 device=self.cfg.model.device,
@@ -35,12 +31,9 @@ class WhisperTranscriber:
             )
         except Exception as e:
             logger.critical(f"Failed to initialize Whisper model: {e}")
-            raise RuntimeError("Model initialization failed.") from e
+            raise
 
     def transcribe(self, audio_path: Path) -> TranscriptionResult:
-        """
-        Esegue la trascrizione con logging granulare e ritorno strutturato.
-        """
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
@@ -52,26 +45,37 @@ class WhisperTranscriber:
             language=t_cfg.language,
             beam_size=t_cfg.beam_size,
             vad_filter=t_cfg.vad_filter,
-            vad_parameters=t_cfg.vad_parameters.model_dump(),
+            vad_parameters=t_cfg.vad_parameters.dict(),
             initial_prompt=t_cfg.initial_prompt,
             condition_on_previous_text=False
         )
 
-        logger.info(f"Detected language: {info.language} ({info.language_probability:.2%})")
+        logger.info(f"Language: {info.language} | Total Audio Duration: {info.duration:.2f}s")
 
         processed_segments = []
         full_text_parts = []
-
-        for segment in segments_gen:
-            logger.debug(f"[{segment.start:.2f}s -> {segment.end:.2f}s] Processing segment...")
+        
+        with tqdm(
+            total=round(info.duration, 2), 
+            unit="s", 
+            desc=f"Transcriving {audio_path.stem}", 
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n:.2f}/{total:.2f}s [{elapsed}<{remaining}, {rate_fmt}]",
+            colour="green"
+        ) as pbar:
             
-            segment_data = {
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text.strip()
-            }
-            processed_segments.append(segment_data)
-            full_text_parts.append(segment_data["text"])
+            previous_end = 0.0
+            for segment in segments_gen:
+                segment_data = {
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text.strip()
+                }
+                processed_segments.append(segment_data)
+                full_text_parts.append(segment_data["text"])
+
+                advance = segment.end - previous_end
+                pbar.update(advance)
+                previous_end = segment.end
 
         return TranscriptionResult(
             text=" ".join(full_text_parts),

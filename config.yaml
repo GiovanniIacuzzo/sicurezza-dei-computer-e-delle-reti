@@ -7,15 +7,9 @@ audio:
   apply_noise_reduction: true
 
 model:
-  project_name: "uni-transcriber-pro"
-  version: "1.0.0"
+  name: "large-v3"
   device: "cuda"
   compute_type: "float16"
-
-logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  save_to_file: true
 
 transcription:
   language: "it"
@@ -23,5 +17,4 @@ transcription:
   vad_filter: true 
   vad_parameters:
     min_silence_duration_ms: 500
-
   initial_prompt: "Questa è la trascrizione fluida, corretta e pulita di una lezione universitaria in italiano, senza esitazioni o interruzioni."

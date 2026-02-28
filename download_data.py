@@ -1,11 +1,11 @@
 import os
-import yaml
 import zipfile
 import logging
 import shutil
 from pathlib import Path
 from typing import List
-from kaggle.api.kaggle_api_extended import KaggleApi
+
+from config import AppConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,25 +16,20 @@ logger = logging.getLogger(__name__)
 class KaggleDownloader:
     """Gestore professionale per il recupero selettivo di asset da Kaggle Datasets."""
 
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = Path(config_path)
-        self.config = self._load_config()
+    def __init__(self, config: AppConfig):
+        self.config = config
         
-        self.dataset_id: str = self.config["kaggle"]["dataset_name"]
-        self.target_path = Path(self.config["kaggle"].get("download_path", "data"))
+        self.dataset_id: str = self.config.kaggle.dataset_name
+        
+        if isinstance(self.config.kaggle.download_path, str):
+            self.target_path = Path(self.config.kaggle.download_path)
+        else:
+            self.target_path = self.config.kaggle.download_path
+            
         self.temp_dir = Path("temp_cache")
         
-        os.environ['KAGGLE_CONFIG_DIR'] = '.'
-        self.api = KaggleApi()
-        
         self._prepare_environment()
-
-    def _load_config(self) -> dict:
-        """Carica e valida il file di configurazione YAML."""
-        if not self.config_path.exists():
-            raise FileNotFoundError(f"Configurazione non trovata: {self.config_path}")
-        with open(self.config_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+        self._authenticate()
 
     def _prepare_environment(self) -> None:
         """Inizializza le directory di destinazione e pulisce cache pregresse."""
@@ -44,16 +39,23 @@ class KaggleDownloader:
         self.temp_dir.mkdir(parents=True)
 
     def _authenticate(self) -> None:
-        """Esegue l'autenticazione API."""
+        """Autenticazione forzata sulla directory corrente."""
         try:
+            os.environ['KAGGLE_CONFIG_DIR'] = str(Path.cwd())
+            
+            from kaggle.api.kaggle_api_extended import KaggleApi
+            self.api = KaggleApi()
             self.api.authenticate()
+            logger.info("Autenticazione Kaggle completata con successo (usando kaggle.json locale).")
+        except OSError as e:
+            logger.error("kaggle.json non trovato nella cartella corrente.")
+            raise e
         except Exception as e:
             logger.error(f"Errore durante l'autenticazione Kaggle: {e}")
             raise
 
     def get_remote_file_list(self) -> List:
         """Recupera i metadati dei file disponibili sul server remoto."""
-        self._authenticate()
         logger.info(f"Interrogazione dataset remoto: {self.dataset_id}")
         return self.api.dataset_list_files(self.dataset_id).files
 
@@ -65,15 +67,18 @@ class KaggleDownloader:
                 logger.warning("Il dataset remoto è vuoto.")
                 return
 
-            print(f"\n{'ID':<5} | {'NOME FILE':<40} | {'DIMENSIONE':<10}")
-            print("-" * 60)
+            print(f"\n{'ID':<5} | {'NOME FILE':<40} | {'DIMENSIONE':<15}")
+            print("-" * 65)
             for i, file in enumerate(remote_files):
-                size_mb = file.sizeBytes / (1024**2)
-                print(f"{i:<5} | {file.name:<40} | {size_mb:>7.2f} MB")
+                file_size = getattr(file, 'size', 'N/A')
+                print(f"{i:<5} | {file.name:<40} | {str(file_size):>15}")
 
             choice = input("\nInserisci l'ID della lezione, una lista (es. 1,3,5) o 'all': ").strip().lower()
             
-            self._execute_download(remote_files, choice)
+            if choice:
+                self._execute_download(remote_files, choice)
+            else:
+                logger.warning("Nessuna selezione effettuata. Uscita.")
 
         except Exception as e:
             logger.error(f"Errore durante il workflow di download: {e}")
@@ -81,7 +86,7 @@ class KaggleDownloader:
             self._cleanup()
 
     def _execute_download(self, file_list: List, choice: str) -> None:
-        """Scarica l'archivio ed estrae solo i file selezionati (Memory efficient)."""
+        """Scarica l'archivio ed estrae solo i file selezionati."""
         logger.info("Avvio download pacchetto compresso...")
         self.api.dataset_download_files(self.dataset_id, path=str(self.temp_dir), unzip=False)
         
@@ -92,8 +97,6 @@ class KaggleDownloader:
             raise FileNotFoundError("Archivio scaricato non trovato.")
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            filenames_to_extract = []
-
             if choice == 'all':
                 filenames_to_extract = [f.name for f in file_list]
             else:
@@ -113,5 +116,10 @@ class KaggleDownloader:
             logger.debug("Cache temporanea rimossa.")
 
 if __name__ == "__main__":
-    downloader = KaggleDownloader()
-    downloader.select_and_download()
+    try:
+        app_config = AppConfig.from_yaml("config.yaml")
+        
+        downloader = KaggleDownloader(app_config)
+        downloader.select_and_download()
+    except Exception as e:
+        logger.critical(f"Errore fatale: {e}")
