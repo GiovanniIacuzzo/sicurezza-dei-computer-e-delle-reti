@@ -112,11 +112,7 @@ Per avviare l'intero processo di acquisizione e trascrizione, segui questi passa
 **1. Preparazione dell'Ambiente**
 Assicurati di avere le dipendenze installate e i tool di sistema (come `ffmpeg`) configurati. 
 ```bash
-# Opzionale: esegui lo script di preparazione se presente
 bash prepare.sh
-
-# Installa le dipendenze Python
-pip install -r requirements.txt
 ```
 
 **2. Setup delle Credenziali Kaggle**
