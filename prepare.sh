@@ -1,13 +1,12 @@
 #!/bin/bash
 
-echo "Creazione della struttura delle directory..."
-mkdir -p data
-mkdir -p model
-mkdir -p dataset
+echo "Aggiornamento e installazione delle librerie di sistema per FFmpeg..."
+sudo apt-get update && sudo apt-get install -y \
+    libavformat-dev libavcodec-dev libavdevice-dev \
+    libavutil-dev libswscale-dev libswresample-dev libavfilter-dev pkg-config
 
-echo "Creazione ambiente Conda (potrebbe richiedere qualche minuto)..."
-conda env create -f environment.yaml
+echo "Installazione delle dipendenze Python da requirements.txt..."
 
-echo "Struttura pronta."
-echo "Per attivare l'ambiente esegui: conda activate asr_env"
-echo "ATTENZIONE: Ricordati di caricare il tuo file kaggle.json in ~/.kaggle/ per l'autenticazione!"
+pip install -r requirements.txt
+
+echo "Setup completato!"
