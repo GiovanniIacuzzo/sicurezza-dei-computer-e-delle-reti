@@ -1,0 +1,84 @@
+La sicurezza informatica moderna parte da un presupposto strategico che affonda le sue radici nel pensiero di Sun Tzu: l'arte della guerra ci insegna a non fare affidamento sulla speranza che il nemico non attacchi, ma sulla nostra preparazione per riceverlo, rendendo la nostra posizione inattaccabile. Poiché azzerare il rischio è impossibile, l'obiettivo principale diventa la \textbf{Gestione del Rischio}.
+
+Nel tempo, le esigenze di sicurezza sono cambiate: se tradizionalmente le informazioni venivano protette con meccanismi fisici o amministrativi, oggi le attività si sono spostate nel cyberspazio. Questo richiede la protezione non solo dei file memorizzati, ma anche dei dati durante la loro trasmissione attraverso le reti. Le definizioni formali, spesso guidate da agenzie americane come il NIST, distinguono tre livelli di complessità crescente:
+
+\begin{itemize}
+    \item \textbf{Computer Security:} Strumenti progettati per proteggere i dati su una singola macchina e scoraggiare gli hacker.
+    \item \textbf{Network Security:} Misure atte a proteggere i dati durante la trasmissione su reti locali.
+    \item \textbf{Internet Security:} Misure per proteggere i dati in transito attraverso un insieme di reti interconnesse.
+\end{itemize}
+
+Il NIST (NISTIR 7298) definisce la sicurezza come l'insieme di misure che garantiscono tre aspetti fondamentali per i sistemi e le informazioni (la cosiddetta \textit{Triade CIA} o \textit{RID} in italiano):
+
+\begin{itemize}
+    \item \textbf{Confidenzialità (Riservatezza):} Preservare le restrizioni autorizzate all'accesso e alla divulgazione delle informazioni, includendo la tutela della privacy.
+    \item \textbf{Integrità:} Difendere i dati da modifiche o distruzioni improprie, garantendo anche la non ripudiabilità e l'autenticità dei dati stessi (un esempio classico è la firma digitale).
+    \item \textbf{Availability (Disponibilità):} Assicurare un accesso tempestivo e affidabile ai dati da parte degli utenti autorizzati.
+\end{itemize}
+
+Recentemente, a questi tre pilastri sono stati affiancati altri due concetti cruciali: l'\textbf{Autenticità} (garantire che l'autore dei dati sia chi dice di essere) e l'\textbf{Accountability} (responsabilità e tracciabilità, come l'uso dei log per sapere chi ha fatto cosa e quando).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{CIA-AA.png}
+    \caption{Estensione della Triade CIA.}
+    \label{fig:CIA-AA}
+\end{figure}
+
+Per analizzare formalmente la sicurezza, l'RFC 2828 definisce gli attori e gli elementi in gioco:
+
+\begin{itemize}
+    \item \textbf{Asset (Risorsa):} L'oggetto della protezione. È un'entità che ha valore per l'organizzazione e può includere hardware, software, dati, infrastrutture di comunicazione, ma anche persone e strutture fisiche.
+    \item \textbf{Minaccia (Threat):} Qualsiasi circostanza o evento potenzialmente in grado di avere un impatto negativo sulle operazioni o sugli asset dell'organizzazione.
+    \item \textbf{Vulnerabilità:} Una debolezza nel sistema informativo o nelle procedure che può essere sfruttata da una minaccia.
+    \item \textbf{Attacco:} L'attività malevola messa in atto dall'agente di minaccia (adversary) per tentare di distruggere, degradare o alterare le informazioni.
+    \item \textbf{Contromisura:} Dispositivo o tecnica utilizzata per limitare o prevenire l'efficacia di un attacco, riducendo le vulnerabilità.
+\end{itemize}
+
+In questo ecosistema, gli ``attaccanti'' (Threat agents) desiderano abusare degli asset dando origine a minacce che incrementano il rischio; per contro, i ``proprietari'' (Owners) impongono contromisure per ridurre il rischio e difendere il valore dei propri asset.
+
+Il Rischio è la misura di quanto un'entità sia minacciata ed è funzione della probabilità di occorrenza di un evento e del suo impatto. Il \textbf{Risk Management} è un processo ciclico e continuo diviso in quattro fasi:
+
+\begin{enumerate}
+    \item \textbf{Identificazione:} Rilevare le vulnerabilità, i potenziali pericoli e le fonti di rischio (es. perdita di integrità, impersonamento).
+    \item \textbf{Valutazione:} Determinare quantitativamente e qualitativamente impatto e probabilità, assegnando priorità.
+    \item \textbf{Pianificazione:} Identificare le contromisure da applicare tramite un'analisi costi/benefici.
+    \item \textbf{Controllo:} Monitorare costantemente l'efficacia delle contromisure, poiché ``non si può gestire ciò che non si può misurare''.
+\end{enumerate}
+
+Dal punto di vista matematico, la valutazione del rischio si calcola con la seguente formula:
+\[
+R = P \times I \times E
+\]
+
+Dove:
+
+\begin{itemize}
+    \item \textbf{P (Probabilità):} La probabilità che la minaccia sfrutti una vulnerabilità.
+    \item \textbf{I (Impatto):} La gravità del danno qualora l'attacco abbia successo. Il livello di impatto può essere classificato in \textit{Basso}, \textit{Moderato} o \textit{Alto} (con effetti catastrofici).
+    \item \textbf{E (Efficacia dei controlli):} Il valore è alto se i controlli messi in atto sono poco efficaci.
+\end{itemize}
+
+Proteggere un sistema non è affatto banale e si scontra con una serie di problematiche intrinseche:
+
+\begin{itemize}
+    \item \textbf{Asimmetria:} Agli attaccanti basta trovare una singola vulnerabilità per avere successo, mentre i progettisti devono scovare ed eliminare tutte le debolezze per ottenere una sicurezza perfetta.
+    \item \textbf{L'Errore Umano e l'Usabilità:} Molti utenti (e persino amministratori) percepiscono i sistemi di sicurezza rigorosi come un impedimento all'efficienza e alla facilità d'uso del sistema. L'essere umano rappresenta spesso ``l'anello più debole'' della catena.
+    \item \textbf{Sicurezza come ``Afterthought'':} Troppo spesso la sicurezza viene aggiunta alla fine del processo di sviluppo, anziché essere integrata sin dalla fase di design.
+    \item \textbf{Percezione del Beneficio:} Vi è una naturale tendenza a percepire un basso ritorno sull'investimento per la sicurezza... finché non si verifica un incidente e si diventa vittime. Questo si ricollega al mantra fondamentale: \textit{``You Don't Have To Be a Target To Become a Victim''}.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Rischio_flow.png}
+    \caption{Flow Chart del Rischio.}
+    \label{fig:Rischio-flow}
+\end{figure}
+
+La figura illustra il delicato ecosistema della sicurezza informatica, che possiamo immaginare come una continua partita a scacchi tra chi difende e chi attacca. Al centro di questo scenario troviamo gli \textit{Asset} (le risorse), ovvero i beni preziosi a cui i proprietari (gli \textit{Owners}) attribuiscono un grande valore. Inevitabilmente, ai vari tipi di vulnerabilità di una risorsa di sistema corrispondono le minacce che sono in grado di sfruttare tali vulnerabilità.
+
+Sul lato destro si posizionano gli avversari: i \textit{Threat agents}. L'agente che esegue l'attacco viene chiamato attaccante o agente che minaccia. Essi sono spinti dal desiderio di abusare o danneggiare le risorse e, con la loro presenza, danno origine alle \textit{Threats} (Minacce). Una minaccia rappresenta un potenziale danno alla sicurezza di una risorsa. Quando questa minaccia viene effettivamente eseguita, si trasforma in un attacco (azione minatoria) e, se ha successo, porta a una violazione indesiderata della sicurezza. L'offensiva può assumere diverse forme: un attacco attivo, ovvero un tentativo di alterare le risorse del sistema o di influenzarne il funzionamento, oppure un attacco passivo, un tentativo di apprendere informazioni dal sistema, o farne uso, ma che non influisce sulle sue risorse. Inoltre, la minaccia può essere sferrata da un \textit{insider} autorizzato (attacco interno) oppure da un \textit{outsider} illegittimo (attacco esterno). L'azione congiunta di questi fattori fa inevitabilmente innalzare il livello di Rischio (\textit{Risk}).
+
+A contrapporsi a questa forza offensiva ci sono i difensori, situati sul lato sinistro dello schema. I gestori (o \textit{Owners}) desiderano fortemente minimizzare il pericolo per le proprie risorse. Per difendersi, impongono quindi delle \textit{Countermeasures} (Contromisure). Una contromisura è qualsiasi mezzo adottato per fronteggiare un attacco alla sicurezza. Idealmente, una contromisura può essere concepita per impedire che un particolare tipo di attacco abbia successo, ma quando la prevenzione non è possibile, l'obiettivo è quello di rilevare l'attacco e rimediare agli effetti dello stesso. Lo scopo vitale delle contromisure è, dunque, quello di ridurre il Rischio globale.
+
+Tuttavia, il Rischio (situato nella parte inferiore del diagramma) funge da indicatore di un equilibrio puramente dinamico. Da una parte le minacce lo spingono verso l'alto, dall'altra le contromisure cercano di abbassarlo. È fondamentale ricordare che una contromisura può essa stessa introdurre nuove vulnerabilità e, a ogni modo, vulnerabilità residue potrebbero rimanere dopo il ricorso a contromisure. Tali vulnerabilità possono essere sfruttate da attaccanti e rappresentano un livello di rischio residuale per le risorse. Sarà compito continuo dei gestori cercare di minimizzare questo rischio, dati gli altri vincoli del sistema.
